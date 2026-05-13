@@ -1,0 +1,10 @@
+.env*
+*.avm
+*.prover
+*.verifier
+outputs/
+build/
+node-*/
+node-data-*/
+.node-data-*/
+.ledger-*/
