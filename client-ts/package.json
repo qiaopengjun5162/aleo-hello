@@ -1,0 +1,16 @@
+{
+  "name": "client-ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node --env-file=../.env --import tsx index.ts"
+  },
+  "dependencies": {
+    "@provablehq/sdk": "^0.10.5",
+    "tsx": "^4.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "typescript": "^6.0.3"
+  }
+}

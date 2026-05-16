@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    // Node.js environment
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "types": ["node"],
+    "module": "Node16",
+    "moduleDetection": "force",
+    "allowJs": true,
+
+    // Node.js mode
+    "moduleResolution": "Node16",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    // Best practices
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    // Some stricter flags (disabled by default)
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false
+  }
+}
