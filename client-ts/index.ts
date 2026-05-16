@@ -19,7 +19,6 @@ async function waitForConfirmation(
             if (tx.status === "accepted" || tx.status === "confirmed") return tx.status;
             if (tx.status === "rejected") throw new Error(`Transaction rejected`);
         } catch (err) {
-            // 404 is expected until the transaction is confirmed — silently retry
             const msg = err instanceof Error ? err.message : String(err);
             if (!msg.includes("404") && !msg.includes("not found")) {
                 console.warn(`  Polling error: ${msg}`);
@@ -56,6 +55,7 @@ async function main() {
     const programName = "hello_paxon_2026.aleo";
     const functionName = "main";
 
+    // Step 1: Build the execution transaction (includes ZK proof generation)
     console.log("\n[1/3] Building execution transaction...");
     const startTime = Date.now();
     const tx = await programManager.buildExecutionTransaction({
@@ -68,14 +68,22 @@ async function main() {
     });
     console.log(`  Done in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 
+    // Step 2: Submit the transaction to the network
+    // submitTransaction accepts both Transaction object and string — passing
+    // the object directly is consistent with the official docs.
     console.log("[2/3] Submitting...");
-    const txId = await programManager.networkClient.submitTransaction(tx.toString());
+    const txId = await programManager.networkClient.submitTransaction(tx);
 
+    // Step 3: Wait for confirmation (1-3 blocks, ~3-9 seconds)
     console.log("[3/3] Waiting for confirmation...");
     const status = await waitForConfirmation(programManager, txId);
 
+    // Get the confirmed transaction details from the network
+    const transaction = await programManager.networkClient.getTransaction(txId);
+
     console.log(`\nTransaction: ${txId}`);
     console.log(`Status:     ${status}`);
+    console.log(`Type:       ${transaction.type}`);
     console.log(`Explorer:   https://testnet.explorer.provable.com/transaction/${txId}`);
 }
 
