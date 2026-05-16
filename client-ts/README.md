@@ -1,15 +1,17 @@
 # client-ts
 
-To install dependencies:
+Aleo 测试网程序执行客户端。
+
+## 运行
 
 ```bash
-bun install
+pnpm install
+pnpm start
 ```
 
-To run:
+需要项目根目录有 `.env` 文件，包含 `PRIVATE_KEY=...`。
 
-```bash
-bun run index.ts
-```
+## 文档
 
-This project was created using `bun init` in bun v1.2.17. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+- `CLAUDE.md` — 项目约定和执行流程
+- `TROUBLESHOOTING.md` — 问题排查记录
