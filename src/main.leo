@@ -1,5 +1,5 @@
-// The 'hello' program.
-program hello.aleo {
+// The 'hello_paxon_2026' program.
+program hello_paxon_2026.aleo {
     // This is the constructor for the program.
     // The constructor allows you to manage program upgrades.
     // It is called when the program is deployed or upgraded.
