@@ -2,6 +2,7 @@
   "name": "client-ts",
   "type": "module",
   "private": true,
+  "packageManager": "pnpm@11.0.9",
   "scripts": {
     "start": "node --env-file=../.env --import tsx index.ts"
   },
