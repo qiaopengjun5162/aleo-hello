@@ -103,6 +103,45 @@ Status:     accepted
 
 ---
 
+## 问题 5：浏览器看不到明文执行结果
+
+### 现象
+
+在 Provable Explorer 中，Inputs (Private) 和 Outputs 都显示为 `ciphertext1q...` 密文，看不到实际数字。
+
+### 根因
+
+这是 Aleo ZK 隐私保护的**设计目标**，不是 bug。`fn main(public a: u32, b: u32) -> u32` 中：
+- `a` 声明为 `public` → 链上可见 `10u32`
+- `b` 默认 `private` → 链上加密为 ciphertext
+- 返回值 `output r2 as u32.private` → 链上加密为 ciphertext
+
+浏览器是公共面板，没有你的 View Key，无法解密。
+
+### 解决
+
+在 TypeScript 代码中使用 `programManager.run()` 本地执行获取明文：
+
+```ts
+const localResult = await programManager.run(
+    program,     // 从 API 获取的合约源码
+    "main",
+    ["10u32", "20u32"],
+    false,       // 不需要生成 proof，快速执行
+);
+const outputs = localResult.getOutputs(); // ["30u32"]
+```
+
+完整流程：本地试运行(验证输出) → 链上执行(提交 ZK proof) → 确认。
+
+### 安全模型
+
+- **链上**：全网节点验证 ZK proof 数学正确性，但看不到私有数据
+- **本地**：持有 View Key 的开发者可以解密看到明文结果
+- `Status: accepted` = 网络已验证 proof 通过，结果正确
+
+---
+
 ## 参考资料
 
 - [Aleo SDK 官方文档 - Executing Programs](https://developer.aleo.org/sdk/guides/execute_programs)

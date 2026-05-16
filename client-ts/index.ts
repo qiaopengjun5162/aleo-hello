@@ -54,36 +54,58 @@ async function main() {
 
     const programName = "hello_paxon_2026.aleo";
     const functionName = "main";
+    const inputs = ["10u32", "20u32"];
+    const cacheKey = `${programName}:${functionName}`;
+    const expectedOutput = "30u32";
 
-    // Step 1: Build the execution transaction (includes ZK proof generation)
-    console.log("\n[1/3] Building execution transaction...");
+    // Fetch program source from the network
+    const program = await programManager.networkClient.getProgram(programName);
+
+    // Step 0: Local dry-run to verify expected output (fast, no proof)
+    console.log("\n[0] Local dry-run (verifying expected output)...");
+    const localResult = await programManager.run(
+        program,
+        functionName,
+        inputs,
+        false, // don't prove — fast
+    );
+    const localOutputs = localResult.getOutputs();
+    console.log(`  Expected: ${expectedOutput}`);
+    console.log(`  Got:      ${localOutputs[0]}`);
+    if (localOutputs[0] !== expectedOutput) {
+        console.error(`  MISMATCH!`);
+        process.exit(1);
+    }
+    console.log("  OK");
+
+    // Step 1: Build execution transaction (ZK proof generation)
+    console.log("\n[1] Building execution transaction...");
     const startTime = Date.now();
     const tx = await programManager.buildExecutionTransaction({
         programName,
         functionName,
         priorityFee: 0.001,
         privateFee: false,
-        inputs: ["10u32", "20u32"],
-        keySearchParams: { cacheKey: `${programName}:${functionName}` },
+        inputs,
+        keySearchParams: { cacheKey },
     });
     console.log(`  Done in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 
-    // Step 2: Submit the transaction to the network
-    // submitTransaction accepts both Transaction object and string — passing
-    // the object directly is consistent with the official docs.
-    console.log("[2/3] Submitting...");
+    // Step 2: Submit
+    console.log("[2] Submitting...");
     const txId = await programManager.networkClient.submitTransaction(tx);
 
-    // Step 3: Wait for confirmation (1-3 blocks, ~3-9 seconds)
-    console.log("[3/3] Waiting for confirmation...");
+    // Step 3: Wait for confirmation
+    console.log("[3] Waiting for confirmation...");
     const status = await waitForConfirmation(programManager, txId);
 
-    // Get the confirmed transaction details from the network
+    // Get confirmed transaction details
     const transaction = await programManager.networkClient.getTransaction(txId);
 
     console.log(`\nTransaction: ${txId}`);
     console.log(`Status:     ${status}`);
     console.log(`Type:       ${transaction.type}`);
+    console.log(`Result:     ${localOutputs[0]} (verified via local execution)`);
     console.log(`Explorer:   https://testnet.explorer.provable.com/transaction/${txId}`);
 }
 
