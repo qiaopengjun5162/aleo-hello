@@ -106,7 +106,7 @@ async fn main() -> Result<()> {
     let uri = v2_base
         .parse::<http::Uri>()
         .context("Failed to parse API base URL")?;
-    let query = Query::<TestnetV0, BlockMemory<_>>::from(uri);
+    let query = Query::<TestnetV0, BlockMemory<_>>::from(uri.clone());
 
     // --- Execution Proof ---
     trace
@@ -153,8 +153,10 @@ async fn main() -> Result<()> {
         .execute::<AleoTestnetV0, _>(fee_authorization, &mut rng)
         .context("Failed to execute fee")?;
 
+    // Create a fresh query for the fee trace to avoid stale connection issues
+    let fee_query = Query::<TestnetV0, BlockMemory<_>>::from(uri.clone());
     fee_trace
-        .prepare(&query)
+        .prepare(&fee_query)
         .context("Failed to prepare fee trace")?;
 
     let fee = fee_trace
@@ -167,7 +169,7 @@ async fn main() -> Result<()> {
     println!("\n🔍 Verifying proofs locally...");
     process
         .verify_execution(
-            ConsensusVersion::V1,
+            ConsensusVersion::V14,
             VarunaVersion::V1,
             InclusionVersion::V0,
             &execution,
@@ -177,7 +179,7 @@ async fn main() -> Result<()> {
 
     process
         .verify_fee(
-            ConsensusVersion::V1,
+            ConsensusVersion::V14,
             VarunaVersion::V1,
             InclusionVersion::V0,
             &fee,
