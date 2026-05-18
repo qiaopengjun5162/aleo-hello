@@ -115,7 +115,7 @@ async fn main() -> Result<()> {
 
     let execution = trace
         .prove_execution::<AleoTestnetV0, _>(
-            "hello_paxon_2026",
+            &program.id().to_string(),  // Must match on-chain program ID exactly (with .aleo suffix)
             VarunaVersion::V1,
             &mut rng,
         )
