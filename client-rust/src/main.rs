@@ -44,6 +44,7 @@ async fn main() -> Result<()> {
         env::var("PRIVATE_KEY").context("PRIVATE_KEY not found in .env file")?;
 
     let program_name = "hello_paxon_2026.aleo";
+    let function_name = "main";
     println!("\n🚀 Starting Aleo Rust Client (TestnetV0)\n");
 
     // ── Phase 0: Fetch program & init VM ────────────────────
@@ -71,7 +72,7 @@ async fn main() -> Result<()> {
         .authorize::<AleoTestnetV0, _>(
             &private_key,
             program.id(),
-            "main",
+            function_name,
             inputs.into_iter(),
             &mut rng,
         )
@@ -112,9 +113,11 @@ async fn main() -> Result<()> {
         .prepare(&query)
         .context("Failed to prepare execution trace")?;
 
+    // locator format: "{program_id}/{function_name}" (e.g. "hello_paxon_2026.aleo/main")
+    let locator = format!("{}/{}", program.id(), function_name);
     let execution = trace
         .prove_execution::<AleoTestnetV0, _>(
-            &program.id().to_string(),  // Must match on-chain program ID exactly (with .aleo suffix)
+            &locator,
             VarunaVersion::V1,
             &mut rng,
         )
@@ -159,6 +162,30 @@ async fn main() -> Result<()> {
         .context("Failed to generate fee proof")?;
     println!("✅ Fee proof generated in {:?}", fee_start.elapsed());
 
+    // --- Local verification (like Python SDK's verify_execution/verify_fee) ---
+    use snarkvm::prelude::{ConsensusVersion, InclusionVersion};
+    println!("\n🔍 Verifying proofs locally...");
+    process
+        .verify_execution(
+            ConsensusVersion::V1,
+            VarunaVersion::V1,
+            InclusionVersion::V0,
+            &execution,
+        )
+        .context("Local execution verification FAILED — proof is invalid")?;
+    println!("  ✅ Execution proof verified locally");
+
+    process
+        .verify_fee(
+            ConsensusVersion::V1,
+            VarunaVersion::V1,
+            InclusionVersion::V0,
+            &fee,
+            execution_id,
+        )
+        .context("Local fee verification FAILED — proof is invalid")?;
+    println!("  ✅ Fee proof verified locally");
+
     // --- Package ---
     let transaction = Transaction::<TestnetV0>::from_execution(execution, Some(fee))
         .context("Failed to package transaction")?;
@@ -169,7 +196,8 @@ async fn main() -> Result<()> {
     // ── Phase 4: Broadcast ──────────────────────────────────
     println!("📡 Phase 4: Broadcasting to network...");
     let broadcast_url = format!("{}/transaction/broadcast", node_url);
-    let tx_json = serde_json::to_string(&transaction)?;
+    // Use Display trait (same as TS SDK's transaction.toString())
+    let tx_json = transaction.to_string();
 
     let client = reqwest::Client::new();
     let resp = client
