@@ -1,6 +1,6 @@
 # aleo-hello
 
-A minimal Aleo program on testnet — with a production-grade TypeScript SDK workflow, local dry-run verification, and detailed troubleshooting notes.
+A minimal Aleo program on testnet — with both TypeScript and Rust SDK clients, local dry-run verification, and detailed troubleshooting notes.
 
 ## What it does
 
@@ -16,30 +16,27 @@ program hello_paxon_2026.aleo {
 }
 ```
 
-The TypeScript client (`client-ts/`) executes this on-chain and **verifies the plaintext output locally** — since Aleo stores all private data as ciphertext on-chain.
+Aleo stores all private data as ciphertext on-chain. Both clients **verify the plaintext output locally** (30u32) using different approaches.
 
 ## Project structure
 
 ```
-├── src/main.leo         # Leo program source
-├── program.json         # Leo project config
-├── tests/               # Leo tests
-├── client-ts/           # TypeScript SDK client
-│   ├── index.ts         # 4-step execution workflow
-│   ├── TROUBLESHOOTING.md  # 5 real-world issues & solutions
-│   └── CLAUDE.md        # Project conventions
+├── src/main.leo              # Leo program source
+├── program.json              # Leo project config
+├── tests/                    # Leo tests
+├── client-ts/                # TypeScript SDK client (working)
+│   ├── index.ts              # 4-step execution workflow
+│   ├── TROUBLESHOOTING.md    # 5 issues & solutions
+│   └── CLAUDE.md
+├── client-rust/              # Rust snarkVM client (local ok, broadcast debugging)
+│   ├── src/main.rs           # Full ZK proving pipeline
+│   ├── TROUBLESHOOTING.md    # 7 issues & solutions
+│   └── Cargo.toml
 ```
 
 ## Quick start
 
-### 1. Deploy the program (Leo CLI)
-
-```bash
-leo build
-leo deploy --network testnet
-```
-
-### 2. Execute via TypeScript SDK
+### TypeScript (pnpm + Node.js v24)
 
 ```bash
 cd client-ts
@@ -47,42 +44,35 @@ pnpm install
 pnpm start
 ```
 
-Requires a `.env` file in the project root with `PRIVATE_KEY=...`.
+### Rust (Cargo)
 
-Output:
-
+```bash
+cd client-rust
+cargo run
 ```
-[0] Local dry-run...            ~1s
-  Expected: 30u32
-  Got:      30u32
-  OK
 
-[1] Building execution (ZK proving)...  ~30s first run
-[2] Submitting...
-[3] Waiting for confirmation...
-  Waiting...
+Both require a `.env` file in the project root with `PRIVATE_KEY=...` and `NODE_URL=https://api.provable.com/v2/testnet`.
 
-Transaction: at1...
-Status:     accepted
-Type:       execute
-Result:     30u32
-```
+## Status
+
+| Client | Local execution | ZK proving | Broadcast | Chain confirm |
+|--------|:---:|:---:|:---:|:---:|
+| TypeScript | ✅ | ✅ | ✅ | ✅ |
+| Rust | ✅ | ✅ | ✅ | ❌ (state root staleness) |
+
+Rust client: proofs pass local verification but are rejected on-chain — likely due to state root expiring during proving (~35s gap). See `client-rust/TROUBLESHOOTING.md`.
 
 ## Why this is useful
 
-This project demonstrates the complete Aleo developer workflow:
-
-- **Leo program** → compile → deploy → execute on-chain
-- **ZK privacy model** — why the explorer shows ciphertext but your code sees plaintext
-- **Real troubleshooting** — Bun WASM incompatibility, 404 noise during confirmation, key synthesis performance, VSCode tsconfig issues, and how to get plaintext results from a zero-knowledge chain
-
-See `client-ts/TROUBLESHOOTING.md` for the full debug log.
+- Complete Aleo workflow: Leo → deploy → SDK execution
+- ZK privacy model explained — why explorer shows ciphertext, code sees plaintext
+- Real troubleshooting: Bun WASM incompatibility, 404 noise, key synthesis, VSCode tsconfig, snarkVM version mismatch, consensus version alignment
 
 ## Requirements
 
-- [Leo](https://developer.aleo.org/leo) (for building Leo programs)
-- Node.js v24+
-- pnpm
+- [Leo](https://developer.aleo.org/leo) (for building programs)
+- Node.js v24+ / pnpm (for TS client)
+- Rust 1.95+ (for Rust client)
 
 ## License
 
