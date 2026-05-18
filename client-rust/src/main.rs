@@ -50,9 +50,8 @@ async fn main() -> Result<()> {
     let program = fetch_program(&node_url, program_name).await?;
     println!("[Success] Program loaded: {}", program.id());
 
-    let process = Process::<TestnetV0>::load_v0().context("Failed to init Process")?;
+    let mut process = Process::<TestnetV0>::load_v0().context("Failed to init Process")?;
     process
-        .lock()
         .add_program(&program)
         .context("Failed to add program to Process")?;
 

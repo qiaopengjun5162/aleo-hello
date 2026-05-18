@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# 直接引入 Aleo 官方的心脏仓库（使用 staging 分支）
-snarkvm = { git = "https://github.com/ProvableHQ/snarkVM.git", branch = "staging", features = [
+# Use latest stable release tag. staging branch may contain breaking changes
+# that are incompatible with deployed testnet validators.
+# If this tag doesn't work, try: v4.5.0, v4.0.0
+snarkvm = { git = "https://github.com/ProvableHQ/snarkVM.git", tag = "v4.6.4", features = [
     "synthesizer",
     "ledger",
 ] }
