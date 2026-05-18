@@ -1,0 +1,21 @@
+[package]
+name = "client-rust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# 直接引入 Aleo 官方的心脏仓库（使用 staging 分支）
+snarkvm = { git = "https://github.com/ProvableHQ/snarkVM.git", branch = "staging", features = [
+    "synthesizer",
+    "ledger",
+] }
+
+# 异步运行时（WASM 多线程在 Rust 里变成了真正的原生 Tokio 异步多线程）
+tokio = { version = "1.52.3", features = ["full"] }
+# 优雅的错误处理
+anyhow = "1.0.102"
+# 用来替代 TS SDK 发送广播的 HTTP 客户端
+reqwest = { version = "0.13.3", features = ["json"] }
+dotenvy = "0.15.7"
+serde_json = "1.0.149"
+http = "1.4.0"
