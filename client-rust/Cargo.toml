@@ -4,10 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# Use latest stable release tag. staging branch may contain breaking changes
-# that are incompatible with deployed testnet validators.
-# If this tag doesn't work, try: v4.5.0, v4.0.0
-snarkvm = { git = "https://github.com/ProvableHQ/snarkVM.git", tag = "v4.6.4", features = [
+# Use testnet branch — v4.6.4 tag is mainnet, incompatible with testnet validators
+# TS SDK wasm is also built from testnet branch
+snarkvm = { git = "https://github.com/ProvableHQ/snarkVM.git", branch = "testnet", features = [
     "synthesizer",
     "ledger",
 ] }

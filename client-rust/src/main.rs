@@ -121,7 +121,10 @@ async fn main() -> Result<()> {
     let program = fetch_program(&client, &node_url, program_name).await?;
     println!("[Success] Program loaded: {}", program.id());
 
-    let mut process = Process::<TestnetV0>::load_v0()?;
+    let mut process = Process::<TestnetV0>::load()?;
+    // Load credits.aleo program with pre-deployed proving/verifying keys
+    let credits_program = Program::<TestnetV0>::credits()?;
+    process.add_program(&credits_program)?;
     process.add_program(&program)?;
 
     let private_key = PrivateKey::<TestnetV0>::from_str(&pk_string)?;
@@ -208,7 +211,8 @@ async fn main() -> Result<()> {
 
     // ── Phase 4: Broadcast ─────────────────────────────────
     println!("\n📡 Phase 4: Broadcasting...");
-    let broadcast_url = format!("{}/transaction/broadcast", node_url);
+    // ?check_transaction=true returns detailed validation errors from the node
+    let broadcast_url = format!("{}/transaction/broadcast?check_transaction=true", node_url);
     let tx_json = transaction.to_string();
 
     let resp = client.post(&broadcast_url)
