@@ -6,7 +6,7 @@ use snarkvm::algorithms::snark::varuna::VarunaVersion;
 use snarkvm::circuit::AleoTestnetV0;
 use snarkvm::ledger::block::Transaction;
 use snarkvm::ledger::query::QueryTrait;
-use snarkvm::parameters::testnet::{FeePublicProver, FeePublicVerifier};
+use snarkvm::parameters::testnet::{FeePublicV0Prover, FeePublicV0Verifier};
 use snarkvm::prelude::{
     ConsensusVersion, Field, Identifier, InclusionVersion, Network, PrivateKey, Process, Program,
     StatePath, TestRng, TestnetV0,
@@ -130,25 +130,23 @@ async fn main() -> Result<()> {
     process.add_program(&credits_program)?;
     process.add_program(&program)?;
 
-    // Force-load and inject official fee keys from parameters.provable.com/testnet
-    // snarkVM's macros.rs auto-downloads these if not cached in ~/.aleo/resources/
-    println!("⏳ Loading official fee keys from testnet parameters...");
-    let fee_pk_bytes = FeePublicProver::load_bytes()
-        .context("Failed to load fee_public prover")?;
-    let fee_vk_bytes = FeePublicVerifier::load_bytes()
-        .context("Failed to load fee_public verifier")?;
-    println!("   Prover: {} bytes, Verifier: {} bytes", fee_pk_bytes.len(), fee_vk_bytes.len());
+    // Load V0 fee keys (NOT standard) — deployed program uses edition 0 / V0 credits
+    println!("⏳ Loading V0 fee keys from testnet parameters...");
+    let fee_pk_bytes = FeePublicV0Prover::load_bytes()
+        .context("Failed to load V0 fee_public prover")?;
+    let fee_vk_bytes = FeePublicV0Verifier::load_bytes()
+        .context("Failed to load V0 fee_public verifier")?;
 
     let fee_pk = ProvingKey::<TestnetV0>::from_bytes_le(&fee_pk_bytes)
-        .context("Failed to deserialize fee proving key")?;
+        .context("Failed to deserialize V0 fee proving key")?;
     let fee_vk = VerifyingKey::<TestnetV0>::from_bytes_le(&fee_vk_bytes)
-        .context("Failed to deserialize fee verifying key")?;
+        .context("Failed to deserialize V0 fee verifying key")?;
 
     let credits_id = credits_program.id();
     let fee_fn = Identifier::<TestnetV0>::from_str("fee_public")?;
     process.insert_proving_key(credits_id, &fee_fn, fee_pk)?;
     process.insert_verifying_key(credits_id, &fee_fn, fee_vk)?;
-    println!("✅ Fee keys injected into VM");
+    println!("✅ V0 Fee keys injected into VM");
 
     let private_key = PrivateKey::<TestnetV0>::from_str(&pk_string)?;
     println!("🔑 Account ready\n");
@@ -194,7 +192,7 @@ async fn main() -> Result<()> {
 
     let locator = format!("{}/{}", program.id(), function_name);
     let execution = trace
-        .prove_execution::<AleoTestnetV0, _>(&locator, VarunaVersion::V1, &mut rng)?;
+        .prove_execution::<AleoTestnetV0, _>(&locator, VarunaVersion::V2, &mut rng)?;
     let execution_id = execution.to_execution_id()?;
 
     // Step B: Authorize and execute fee
@@ -216,17 +214,18 @@ async fn main() -> Result<()> {
     fee_trace.prepare(&query2)?;
 
     // Step D: Prove fee
+    // Try V2 — testnet may have upgraded fee proof version
     let fee = fee_trace
-        .prove_fee::<AleoTestnetV0, _>(VarunaVersion::V1, &mut rng)?;
+        .prove_fee::<AleoTestnetV0, _>(VarunaVersion::V2, &mut rng)?;
 
     // ── Local verification ─────────────────────────────────
     println!("\n🔍 Verifying proofs locally...");
     process.verify_execution(
-        ConsensusVersion::V14, VarunaVersion::V1, InclusionVersion::V0, &execution,
+        ConsensusVersion::V14, VarunaVersion::V2, InclusionVersion::V0, &execution,
     )?;
     println!("  ✅ Execution proof verified");
     process.verify_fee(
-        ConsensusVersion::V14, VarunaVersion::V1, InclusionVersion::V0, &fee, execution_id,
+        ConsensusVersion::V14, VarunaVersion::V2, InclusionVersion::V0, &fee, execution_id,
     )?;
     println!("  ✅ Fee proof verified");
 
