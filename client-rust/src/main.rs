@@ -6,10 +6,13 @@ use snarkvm::algorithms::snark::varuna::VarunaVersion;
 use snarkvm::circuit::AleoTestnetV0;
 use snarkvm::ledger::block::Transaction;
 use snarkvm::ledger::query::QueryTrait;
+use snarkvm::parameters::testnet::{FeePublicProver, FeePublicVerifier};
 use snarkvm::prelude::{
-    ConsensusVersion, Field, InclusionVersion, Network, PrivateKey, Process, Program,
+    ConsensusVersion, Field, Identifier, InclusionVersion, Network, PrivateKey, Process, Program,
     StatePath, TestRng, TestnetV0,
 };
+use snarkvm::prelude::FromBytes as _;
+use snarkvm::synthesizer::snark::{ProvingKey, VerifyingKey};
 use std::env;
 use std::io::Write;
 use std::str::FromStr;
@@ -127,6 +130,26 @@ async fn main() -> Result<()> {
     process.add_program(&credits_program)?;
     process.add_program(&program)?;
 
+    // Force-load and inject official fee keys from parameters.provable.com/testnet
+    // snarkVM's macros.rs auto-downloads these if not cached in ~/.aleo/resources/
+    println!("⏳ Loading official fee keys from testnet parameters...");
+    let fee_pk_bytes = FeePublicProver::load_bytes()
+        .context("Failed to load fee_public prover")?;
+    let fee_vk_bytes = FeePublicVerifier::load_bytes()
+        .context("Failed to load fee_public verifier")?;
+    println!("   Prover: {} bytes, Verifier: {} bytes", fee_pk_bytes.len(), fee_vk_bytes.len());
+
+    let fee_pk = ProvingKey::<TestnetV0>::from_bytes_le(&fee_pk_bytes)
+        .context("Failed to deserialize fee proving key")?;
+    let fee_vk = VerifyingKey::<TestnetV0>::from_bytes_le(&fee_vk_bytes)
+        .context("Failed to deserialize fee verifying key")?;
+
+    let credits_id = credits_program.id();
+    let fee_fn = Identifier::<TestnetV0>::from_str("fee_public")?;
+    process.insert_proving_key(credits_id, &fee_fn, fee_pk)?;
+    process.insert_verifying_key(credits_id, &fee_fn, fee_vk)?;
+    println!("✅ Fee keys injected into VM");
+
     let private_key = PrivateKey::<TestnetV0>::from_str(&pk_string)?;
     println!("🔑 Account ready\n");
 
@@ -175,6 +198,8 @@ async fn main() -> Result<()> {
     let execution_id = execution.to_execution_id()?;
 
     // Step B: Authorize and execute fee
+    // NOTE: fee keys must be injected BEFORE authorize_fee_public/execute,
+    // because execute() stores the proving key in transition_tasks
     let base_fee = 1_327u64;
     let priority_fee = 100_000u64; // High tip to beat mempool congestion
 
