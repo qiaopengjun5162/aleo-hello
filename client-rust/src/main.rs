@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use clap::Parser;
 use dotenvy::dotenv;
 use reqwest::Client;
 use snarkvm::algorithms::snark::varuna::VarunaVersion;
@@ -16,6 +17,35 @@ use snarkvm::synthesizer::snark::{ProvingKey, VerifyingKey};
 use std::env;
 use std::io::Write;
 use std::str::FromStr;
+
+/// Aleo program execution client
+#[derive(Parser)]
+#[command(name = "aleo-execute", about = "Execute an Aleo program on testnet")]
+struct Cli {
+    /// Program name (e.g. hello_paxon_2026.aleo)
+    #[arg(long, default_value = "hello_paxon_2026.aleo")]
+    program: String,
+
+    /// Function name
+    #[arg(long, default_value = "main")]
+    function: String,
+
+    /// Inputs, comma-separated (e.g. "10u32,20u32")
+    #[arg(long, default_value = "10u32,20u32")]
+    inputs: String,
+
+    /// Priority fee in microcredits
+    #[arg(long, default_value_t = 100_000)]
+    priority_fee: u64,
+
+    /// Node URL
+    #[arg(long, env = "NODE_URL", default_value = "https://api.provable.com/v2/testnet")]
+    node_url: String,
+
+    /// Dry-run only: execute locally and show output, don't broadcast
+    #[arg(long)]
+    dry_run: bool,
+}
 
 /// Custom query that returns a fixed state root.
 /// Bypasses snarkVM's internal ureq (blocked by WAF) and ensures
@@ -103,16 +133,23 @@ async fn fetch_state_root(client: &Client, node_url: &str) -> Result<(<TestnetV0
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok();
-
-    let node_url = env::var("NODE_URL")
-        .unwrap_or_else(|_| "https://api.provable.com/v2/testnet".to_string());
+    let cli = Cli::parse();
 
     let pk_string = env::var("PRIVATE_KEY")
         .context("PRIVATE_KEY not found in .env file")?;
 
-    let program_name = "hello_paxon_2026.aleo";
-    let function_name = "main";
-    println!("\n🚀 Starting Aleo Rust Client (TestnetV0)\n");
+    let program_name = &cli.program;
+    let function_name = &cli.function;
+    let inputs: Vec<&str> = cli.inputs.split(',').map(|s| s.trim()).collect();
+    println!("\n🚀 Starting Aleo Rust Client (TestnetV0)");
+    println!("   Program:  {}", program_name);
+    println!("   Function: {}", function_name);
+    println!("   Inputs:   {:?}", inputs);
+    if cli.dry_run {
+        println!("   Mode:     dry-run (local only, no broadcast)\n");
+    } else {
+        println!();
+    }
 
     let client = Client::builder()
         .http1_only()
@@ -121,7 +158,7 @@ async fn main() -> Result<()> {
         .build()?;
 
     // ── Phase 0: Fetch program ─────────────────────────────
-    let program = fetch_program(&client, &node_url, program_name).await?;
+    let program = fetch_program(&client, &cli.node_url, program_name).await?;
     println!("[Success] Program loaded: {}", program.id());
 
     let mut process = Process::<TestnetV0>::load()?;
@@ -152,7 +189,6 @@ async fn main() -> Result<()> {
     println!("🔑 Account ready\n");
 
     let mut rng = TestRng::default();
-    let inputs = vec!["10u32", "20u32"];
     println!("▶️  Inputs: {:?}", inputs);
 
     let start_time = std::time::Instant::now();
@@ -184,7 +220,7 @@ async fn main() -> Result<()> {
 
     // Step A: Prove execution to get execution_id
     println!("⏳ Pre-proving execution to obtain execution_id...");
-    let (state_root, block_height) = fetch_state_root(&client, &node_url).await?;
+    let (state_root, block_height) = fetch_state_root(&client, &cli.node_url).await?;
     println!("🔍 State root: {}\n   Block height: {}", state_root, block_height);
 
     let query = FixedStateRootQuery::<TestnetV0> { state_root, block_height };
@@ -199,7 +235,7 @@ async fn main() -> Result<()> {
     // NOTE: fee keys must be injected BEFORE authorize_fee_public/execute,
     // because execute() stores the proving key in transition_tasks
     let base_fee = 1_327u64;
-    let priority_fee = 100_000u64; // High tip to beat mempool congestion
+    let priority_fee = cli.priority_fee;
 
     let fee_authorization = process.authorize_fee_public::<AleoTestnetV0, _>(
         &private_key, base_fee, priority_fee, execution_id, &mut rng,
@@ -233,10 +269,16 @@ async fn main() -> Result<()> {
     let transaction = Transaction::<TestnetV0>::from_execution(execution, Some(fee))?;
     println!("\n📦 Transaction ID: {}", transaction.id());
 
-    // ── Phase 4: Broadcast ─────────────────────────────────
+    // ── Phase 4: Broadcast (skip if dry-run) ───────────────
+    if cli.dry_run {
+        println!("\n🔍 Dry-run complete. Transaction NOT broadcast.");
+        println!("   Transaction ID (local): {}", transaction.id());
+        return Ok(());
+    }
+
     println!("\n📡 Phase 4: Broadcasting...");
     // ?check_transaction=true returns detailed validation errors from the node
-    let broadcast_url = format!("{}/transaction/broadcast?check_transaction=true", node_url);
+    let broadcast_url = format!("{}/transaction/broadcast?check_transaction=true", &cli.node_url);
     let tx_json = transaction.to_string();
 
     let resp = client.post(&broadcast_url)
@@ -258,7 +300,7 @@ async fn main() -> Result<()> {
 
     // ── Phase 5: Wait for confirmation ────────────────────
     println!("\n⏳ Phase 5: Waiting for confirmation... (polling every 5s)");
-    let check_url = format!("{}/transaction/{}", node_url, transaction.id());
+    let check_url = format!("{}/transaction/{}", &cli.node_url, transaction.id());
 
     for retry in 1..=30 {
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
