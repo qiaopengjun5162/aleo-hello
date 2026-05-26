@@ -8,3 +8,4 @@ node-*/
 node-data-*/
 .node-data-*/
 .ledger-*/
+*.svg
